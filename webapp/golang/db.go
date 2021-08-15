@@ -66,18 +66,18 @@ func transaction(ctx context.Context, opts *sql.TxOptions, handler transactionHa
 
 func generateID(tx *sqlx.Tx, table string) string {
 	id := ulid.MustNew(ulid.Timestamp(time.Now()), entropy).String()
-	for {
-		found := 0
-		if err := tx.QueryRow(fmt.Sprintf("SELECT 1 FROM `%s` WHERE `id` = ? LIMIT 1", table), id).Scan(&found); err != nil {
-			if err == sql.ErrNoRows {
-				break
-			}
-			continue
-		}
-		if found == 0 {
-			break
-		}
-		id = ulid.MustNew(ulid.Timestamp(time.Now()), entropy).String()
-	}
+	// for {
+	// 	found := 0
+	// 	if err := tx.QueryRow(fmt.Sprintf("SELECT 1 FROM `%s` WHERE `id` = ? LIMIT 1", table), id).Scan(&found); err != nil {
+	// 		if err == sql.ErrNoRows {
+	// 			break
+	// 		}
+	// 		continue
+	// 	}
+	// 	if found == 0 {
+	// 		break
+	// 	}
+	// 	id = ulid.MustNew(ulid.Timestamp(time.Now()), entropy).String()
+	// }
 	return id
 }
