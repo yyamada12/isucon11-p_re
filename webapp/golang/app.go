@@ -87,17 +87,37 @@ func getReservations(r *http.Request, s *Schedule) error {
 
 	reserved := 0
 	s.Reservations = []*Reservation{}
+
+	userIDs := []string{}
+
 	for rows.Next() {
 		reservation := &Reservation{}
 		if err := rows.StructScan(reservation); err != nil {
 			return err
 		}
-		reservation.User = getUser(r, reservation.UserID)
+		userIDs = append(userIDs, reservation.UserID)
 
 		s.Reservations = append(s.Reservations, reservation)
 		reserved++
 	}
 	s.Reserved = reserved
+
+	if len(userIDs) == 0 {
+		return nil
+	}
+
+	var userMap map[string]User
+	crtUser := getCurrentUser(r)
+	if crtUser != nil && crtUser.Staff {
+		userMap = getUserByIDsForStaff(userIDs)
+	} else {
+		userMap = getUserByIDs(userIDs)
+	}
+
+	for _, r := range s.Reservations {
+		u := userMap[r.UserID]
+		r.User = &u
+	}
 
 	return nil
 }
@@ -128,6 +148,44 @@ func getUser(r *http.Request, id string) *User {
 		user.Email = ""
 	}
 	return user
+}
+
+func getUserByIDs(userIDs []string) map[string]User {
+
+	qs, params, err := sqlx.In(`SELECT id, nickname, staff, created_at FROM users WHERE id IN (?)`, userIDs)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	users := []User{}
+	if err := db.Select(&users, qs, params...); err != nil {
+		log.Fatal(err)
+	}
+
+	res := make(map[string]User)
+	for _, user := range users {
+		res[user.ID] = user
+	}
+	return res
+}
+
+func getUserByIDsForStaff(userIDs []string) map[string]User {
+
+	qs, params, err := sqlx.In(`SELECT id, email, nickname, staff, created_at FROM users WHERE id IN (?)`, userIDs)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	users := []User{}
+	if err := db.Select(&users, qs, params...); err != nil {
+		log.Fatal(err)
+	}
+
+	res := make(map[string]User)
+	for _, user := range users {
+		res[user.ID] = user
+	}
+	return res
 }
 
 func parseForm(r *http.Request) error {
