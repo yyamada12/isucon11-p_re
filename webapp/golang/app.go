@@ -435,18 +435,15 @@ func createReservationHandler(w http.ResponseWriter, r *http.Request) {
 			return sendErrorJSON(w, fmt.Errorf("capacity is already full"), 403)
 		}
 
+		createdAt := time.Now()
 		if _, err := tx.ExecContext(
 			ctx,
-			"INSERT INTO `reservations` (`id`, `schedule_id`, `user_id`, `created_at`) VALUES (?, ?, ?, NOW(6))",
-			id, scheduleID, userID,
+			"INSERT INTO `reservations` (`id`, `schedule_id`, `user_id`, `created_at`) VALUES (?, ?, ?, ?)",
+			id, scheduleID, userID, createdAt,
 		); err != nil {
 			return err
 		}
 
-		var createdAt time.Time
-		if err := tx.QueryRowContext(ctx, "SELECT `created_at` FROM `reservations` WHERE `id` = ?", id).Scan(&createdAt); err != nil {
-			return err
-		}
 		reservation.ID = id
 		reservation.ScheduleID = scheduleID
 		reservation.UserID = userID
