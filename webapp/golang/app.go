@@ -16,6 +16,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/jmoiron/sqlx"
+	"github.com/oklog/ulid/v2"
 )
 
 var (
@@ -402,10 +403,12 @@ func createReservationHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	reservation := &Reservation{}
+
+	id := ulid.MustNew(ulid.Timestamp(time.Now()), entropy).String()
+	scheduleID := r.PostFormValue("schedule_id")
+	userID := getCurrentUser(r).ID
+
 	err := transaction(r.Context(), &sql.TxOptions{}, func(ctx context.Context, tx *sqlx.Tx) error {
-		id := generateID(tx, "schedules")
-		scheduleID := r.PostFormValue("schedule_id")
-		userID := getCurrentUser(r).ID
 
 		capacity := 0
 		if err := tx.QueryRowContext(ctx, "SELECT `capacity` FROM `schedules` WHERE `id` = ? LIMIT 1 FOR UPDATE", scheduleID).Scan(&capacity); capacity == 0 {
