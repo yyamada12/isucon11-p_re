@@ -426,13 +426,9 @@ func createReservationHandler(w http.ResponseWriter, r *http.Request) {
 			return sendErrorJSON(w, fmt.Errorf("already taken"), 403)
 		}
 
-		rows, err := tx.QueryContext(ctx, "SELECT * FROM `reservations` WHERE `schedule_id` = ?", scheduleID)
-		if err != nil && err != sql.ErrNoRows {
-			return sendErrorJSON(w, err, 500)
-		}
 		reserved := 0
-		for rows.Next() {
-			reserved++
+		if err := tx.QueryRowContext(ctx, "SELECT COUNT(*) FROM `reservations` WHERE `schedule_id` = ?", scheduleID).Scan(&reserved); err != nil {
+			return sendErrorJSON(w, err, 500)
 		}
 
 		if reserved >= capacity {
