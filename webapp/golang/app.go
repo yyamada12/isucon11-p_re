@@ -319,30 +319,24 @@ func signupHandler(w http.ResponseWriter, r *http.Request) {
 
 	user := &User{}
 
-	err := transaction(r.Context(), &sql.TxOptions{}, func(ctx context.Context, tx *sqlx.Tx) error {
-		email := r.FormValue("email")
-		nickname := r.FormValue("nickname")
-		id := generateID(tx, "users")
+	email := r.FormValue("email")
+	nickname := r.FormValue("nickname")
+	id := ulid.MustNew(ulid.Timestamp(time.Now()), entropy).String()
+	createdAt := time.Now()
 
-		if _, err := tx.ExecContext(
-			ctx,
-			"INSERT INTO `users` (`id`, `email`, `nickname`, `created_at`) VALUES (?, ?, ?, NOW(6))",
-			id, email, nickname,
-		); err != nil {
-			return err
-		}
-		user.ID = id
-		user.Email = email
-		user.Nickname = nickname
-
-		return tx.QueryRowContext(ctx, "SELECT `created_at` FROM `users` WHERE `id` = ? LIMIT 1", id).Scan(&user.CreatedAt)
-	})
-
-	if err != nil {
+	if _, err := db.Exec(
+		"INSERT INTO `users` (`id`, `email`, `nickname`, `created_at`) VALUES (?, ?, ?, ?)",
+		id, email, nickname, createdAt,
+	); err != nil {
 		sendErrorJSON(w, err, 500)
-	} else {
-		sendJSON(w, user, 200)
+		return
 	}
+	user.ID = id
+	user.Email = email
+	user.Nickname = nickname
+	user.CreatedAt = createdAt
+
+	sendJSON(w, user, 200)
 }
 
 func loginHandler(w http.ResponseWriter, r *http.Request) {
