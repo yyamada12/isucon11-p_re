@@ -26,6 +26,13 @@ func main() {
 		log.Println(http.ListenAndServe("localhost:6060", nil))
 	}()
 
+	scheduleCounter = ScheduleCounter{m: map[string]int{}}
+	scheduleCounts := []ScheduleCount{}
+	db.Select(&scheduleCounts, "SELECT schedule_id AS id, count(1) AS count FROM `reservations` GROUP BY `schedule_id`")
+	for _, sc := range scheduleCounts {
+		scheduleCounter.Add(sc.ID, sc.Count)
+	}
+
 	srv := &http.Server{
 		Addr:    fmt.Sprintf("%s:%d", bind, port),
 		Handler: serveMux(),

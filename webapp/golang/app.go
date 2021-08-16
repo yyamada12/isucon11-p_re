@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -20,9 +21,32 @@ import (
 )
 
 var (
-	publicDir string
-	fs        http.Handler
+	publicDir       string
+	fs              http.Handler
+	scheduleCounter ScheduleCounter
 )
+
+type ScheduleCounter struct {
+	m  map[string]int
+	mu sync.RWMutex
+}
+
+func (sc *ScheduleCounter) Add(key string, val int) {
+	sc.mu.Lock()
+	defer sc.mu.Unlock()
+	sc.m[key] += val
+}
+
+func (sc *ScheduleCounter) Get(key string) int {
+	sc.mu.RLock()
+	defer sc.mu.RUnlock()
+	return sc.m[key]
+}
+
+type ScheduleCount struct {
+	ID    string `db:"id"`
+	Count int    `db:"count"`
+}
 
 type User struct {
 	ID        string    `db:"id" json:"id"`
@@ -270,9 +294,17 @@ func initializeHandler(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		sendErrorJSON(w, err, 500)
-	} else {
-		sendJSON(w, initializeResponse{Language: "golang"}, 200)
+		return
 	}
+
+	scheduleCounts := []ScheduleCount{}
+	db.Select(&scheduleCounts, "SELECT schedule_id AS id, count(1) AS count FROM `reservations` GROUP BY `schedule_id`")
+	for _, sc := range scheduleCounts {
+		scheduleCounter.Add(sc.ID, sc.Count)
+	}
+
+	sendJSON(w, initializeResponse{Language: "golang"}, 200)
+
 }
 
 func sessionHandler(w http.ResponseWriter, r *http.Request) {
@@ -427,6 +459,7 @@ func createReservationHandler(w http.ResponseWriter, r *http.Request) {
 		); err != nil {
 			return err
 		}
+		scheduleCounter.Add(scheduleID, 1)
 
 		reservation.ID = id
 		reservation.ScheduleID = scheduleID
@@ -442,7 +475,7 @@ func createReservationHandler(w http.ResponseWriter, r *http.Request) {
 
 func schedulesHandler(w http.ResponseWriter, r *http.Request) {
 	schedules := []*Schedule{}
-	rows, err := db.QueryxContext(r.Context(), "SELECT s.id as id, MIN(s.title) as title, MIN(s.capacity) as capacity, MIN(s.created_at) as created_at, COUNT(r.id) as reserved FROM `schedules` s LEFT JOIN `reservations` r ON s.id = r.schedule_id GROUP BY s.id ORDER BY s.`id` DESC")
+	rows, err := db.QueryxContext(r.Context(), "SELECT id, title, capacity, created_at FROM `schedules` ORDER BY `id` DESC")
 	if err != nil {
 		sendErrorJSON(w, err, 500)
 		return
@@ -454,6 +487,7 @@ func schedulesHandler(w http.ResponseWriter, r *http.Request) {
 			sendErrorJSON(w, err, 500)
 			return
 		}
+		schedule.Reserved = scheduleCounter.Get(schedule.ID)
 		schedules = append(schedules, schedule)
 	}
 
