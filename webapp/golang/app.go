@@ -363,32 +363,25 @@ func createScheduleHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	schedule := &Schedule{}
-	err := transaction(r.Context(), &sql.TxOptions{}, func(ctx context.Context, tx *sqlx.Tx) error {
-		id := generateID(tx, "schedules")
-		title := r.PostFormValue("title")
-		capacity, _ := strconv.Atoi(r.PostFormValue("capacity"))
-		createdAt := time.Now()
+	id := ulid.MustNew(ulid.Timestamp(time.Now()), entropy).String()
+	title := r.PostFormValue("title")
+	capacity, _ := strconv.Atoi(r.PostFormValue("capacity"))
+	createdAt := time.Now()
 
-		if _, err := tx.ExecContext(
-			ctx,
-			"INSERT INTO `schedules` (`id`, `title`, `capacity`, `created_at`) VALUES (?, ?, ?, ?)",
-			id, title, capacity, createdAt,
-		); err != nil {
-			return err
-		}
-		schedule.ID = id
-		schedule.Title = title
-		schedule.Capacity = capacity
-		schedule.CreatedAt = createdAt
-
-		return nil
-	})
-
-	if err != nil {
+	if _, err := db.Exec(
+		"INSERT INTO `schedules` (`id`, `title`, `capacity`, `created_at`) VALUES (?, ?, ?, ?)",
+		id, title, capacity, createdAt,
+	); err != nil {
 		sendErrorJSON(w, err, 500)
-	} else {
-		sendJSON(w, schedule, 200)
+		return
 	}
+	schedule.ID = id
+	schedule.Title = title
+	schedule.Capacity = capacity
+	schedule.CreatedAt = createdAt
+
+	sendJSON(w, schedule, 200)
+
 }
 
 func createReservationHandler(w http.ResponseWriter, r *http.Request) {
