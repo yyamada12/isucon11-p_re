@@ -218,17 +218,7 @@ func serveMux() http.Handler {
 
 	router.PathPrefix("/").HandlerFunc(htmlHandler)
 
-	return logger(router)
-}
-
-func logger(handler http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		before := time.Now()
-		handler.ServeHTTP(w, r)
-		after := time.Now()
-		duration := after.Sub(before)
-		log.Printf("%s % 4s %s (%s)", r.RemoteAddr, r.Method, r.URL.Path, duration)
-	})
+	return router
 }
 
 func sendJSON(w http.ResponseWriter, data interface{}, statusCode int) error {
