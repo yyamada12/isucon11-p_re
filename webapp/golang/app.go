@@ -420,12 +420,6 @@ func createReservationHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		found := 0
-		tx.QueryRowContext(ctx, "SELECT 1 FROM `users` WHERE `id` = ? LIMIT 1", userID).Scan(&found)
-		if found != 1 {
-			return sendErrorJSON(w, fmt.Errorf("user not found"), 403)
-		}
-
-		found = 0
 		tx.QueryRowContext(ctx, "SELECT 1 FROM `reservations` WHERE `schedule_id` = ? AND `user_id` = ? LIMIT 1", scheduleID, userID).Scan(&found)
 		if found == 1 {
 			return sendErrorJSON(w, fmt.Errorf("already taken"), 403)
