@@ -398,7 +398,9 @@ func createReservationHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !requiredLogin(w, r) {
+	currentUser := getCurrentUser(r)
+	if currentUser == nil {
+		sendErrorJSON(w, fmt.Errorf("login required"), 401)
 		return
 	}
 
@@ -406,7 +408,7 @@ func createReservationHandler(w http.ResponseWriter, r *http.Request) {
 
 	id := ulid.MustNew(ulid.Timestamp(time.Now()), entropy).String()
 	scheduleID := r.PostFormValue("schedule_id")
-	userID := getCurrentUser(r).ID
+	userID := currentUser.ID
 
 	err := transaction(r.Context(), &sql.TxOptions{}, func(ctx context.Context, tx *sqlx.Tx) error {
 
