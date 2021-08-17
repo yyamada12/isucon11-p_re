@@ -24,6 +24,8 @@ var (
 	publicDir       string
 	fs              http.Handler
 	scheduleCounter ScheduleCounter
+	usersMap        UsersMap
+	usersMapNoEmail UsersMap
 )
 
 type ScheduleCounter struct {
@@ -41,6 +43,23 @@ func (sc *ScheduleCounter) Get(key string) int {
 	sc.mu.RLock()
 	defer sc.mu.RUnlock()
 	return sc.m[key]
+}
+
+type UsersMap struct {
+	m  map[string]*User
+	mu sync.RWMutex
+}
+
+func (sc *UsersMap) Add(u *User) {
+	sc.mu.Lock()
+	defer sc.mu.Unlock()
+	sc.m[u.ID] = u
+}
+
+func (sc *UsersMap) Get(id string) *User {
+	sc.mu.RLock()
+	defer sc.mu.RUnlock()
+	return sc.m[id]
 }
 
 type ScheduleCount struct {
@@ -78,12 +97,8 @@ func getCurrentUser(r *http.Request) *User {
 	if err != nil || uidCookie == nil {
 		return nil
 	}
-	row := db.QueryRowxContext(r.Context(), "SELECT * FROM `users` WHERE `id` = ? LIMIT 1", uidCookie.Value)
-	user := &User{}
-	if err := row.StructScan(user); err != nil {
-		return nil
-	}
-	return user
+
+	return usersMap.Get(uidCookie.Value)
 }
 
 func requiredLogin(w http.ResponseWriter, r *http.Request) bool {
@@ -131,17 +146,17 @@ func getReservations(r *http.Request, s *Schedule) error {
 		return nil
 	}
 
-	var userMap map[string]User
 	crtUser := getCurrentUser(r)
 	if crtUser != nil && crtUser.Staff {
-		userMap = getUserByIDsForStaff(userIDs)
+		for _, r := range s.Reservations {
+			u := usersMap.Get(r.UserID)
+			r.User = u
+		}
 	} else {
-		userMap = getUserByIDs(userIDs)
-	}
-
-	for _, r := range s.Reservations {
-		u := userMap[r.UserID]
-		r.User = &u
+		for _, r := range s.Reservations {
+			u := usersMapNoEmail.Get(r.UserID)
+			r.User = u
+		}
 	}
 
 	return nil
@@ -303,6 +318,20 @@ func initializeHandler(w http.ResponseWriter, r *http.Request) {
 		scheduleCounter.Add(sc.ID, sc.Count)
 	}
 
+	users := []User{}
+	usersMap = UsersMap{m: map[string]*User{}}
+	db.Select(&users, "SELECT * FROM `users`")
+	for _, u := range users {
+		usersMap.Add(&u)
+	}
+
+	usersMapNoEmail = UsersMap{m: map[string]*User{}}
+	users = []User{}
+	db.Select(&users, "SELECT id, nickname, staff, created_at FROM `users`")
+	for _, u := range users {
+		usersMapNoEmail.Add(&u)
+	}
+
 	sendJSON(w, initializeResponse{Language: "golang"}, 200)
 
 }
@@ -335,6 +364,8 @@ func signupHandler(w http.ResponseWriter, r *http.Request) {
 	user.Email = email
 	user.Nickname = nickname
 	user.CreatedAt = createdAt
+
+	usersMap.Add(user)
 
 	sendJSON(w, user, 200)
 }

@@ -33,6 +33,20 @@ func main() {
 		scheduleCounter.Add(sc.ID, sc.Count)
 	}
 
+	usersMap = UsersMap{m: map[string]*User{}}
+	users := []User{}
+	db.Select(&users, "SELECT * FROM `users`")
+	for _, u := range users {
+		usersMap.Add(&u)
+	}
+
+	usersMapNoEmail = UsersMap{m: map[string]*User{}}
+	users = []User{}
+	db.Select(&users, "SELECT id, nickname, staff, created_at FROM `users`")
+	for _, u := range users {
+		usersMapNoEmail.Add(&u)
+	}
+
 	srv := &http.Server{
 		Addr:    fmt.Sprintf("%s:%d", bind, port),
 		Handler: serveMux(),
