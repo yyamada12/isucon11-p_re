@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-
-	_ "net/http/pprof"
 )
 
 var (
@@ -22,9 +20,6 @@ func init() {
 }
 
 func main() {
-	go func() {
-		log.Println(http.ListenAndServe("localhost:6060", nil))
-	}()
 
 	scheduleCounter = ScheduleCounter{m: map[string]int{}}
 	scheduleCounts := []ScheduleCount{}
