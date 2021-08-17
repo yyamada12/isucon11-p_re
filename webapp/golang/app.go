@@ -254,7 +254,7 @@ func sendJSON(w http.ResponseWriter, data interface{}, statusCode int) error {
 }
 
 func sendErrorJSON(w http.ResponseWriter, err error, statusCode int) error {
-	log.Printf("ERROR: %+v", err)
+	// log.Printf("ERROR: %+v", err)
 
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(statusCode)
@@ -436,10 +436,7 @@ func createReservationHandler(w http.ResponseWriter, r *http.Request) {
 			return sendErrorJSON(w, err, 500)
 		}
 
-		reserved := 0
-		if err := tx.QueryRowContext(ctx, "SELECT COUNT(*) FROM `reservations` WHERE `schedule_id` = ?", scheduleID).Scan(&reserved); err != nil {
-			return sendErrorJSON(w, err, 500)
-		}
+		reserved := scheduleCounter.Get(scheduleID)
 
 		if reserved >= capacity {
 			return sendErrorJSON(w, fmt.Errorf("capacity is already full"), 403)
